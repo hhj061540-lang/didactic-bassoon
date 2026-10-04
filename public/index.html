@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Countries API & Flag Explorer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+    }
+  </script>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-full flex flex-col transition-colors duration-200">
+
+  <!-- Header -->
+  <header class="bg-indigo-600 dark:bg-indigo-900 text-white shadow-md py-6 px-4 transition-colors duration-200">
+    <div class="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight">Global Countries Explorer</h1>
+        <p class="text-indigo-100 text-sm mt-1">Powered by your Cloudflare Pages static JSON API (<code class="bg-indigo-700 dark:bg-indigo-800 px-2 py-0.5 rounded text-xs">/api/countries.json</code>)</p>
+      </div>
+      <div class="flex items-center gap-3 w-full md:w-auto">
+        <input 
+          type="text" 
+          id="search-input" 
+          placeholder="Search by country or region..." 
+          class="px-4 py-2 rounded-lg text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-800 border border-transparent dark:border-slate-700 w-full md:w-64 focus:outline-none focus:ring-2 focus:ring-indigo-400 shadow-inner"
+        >
+        <button 
+          id="theme-toggle" 
+          class="p-2 rounded-lg bg-indigo-700 dark:bg-indigo-800 hover:bg-indigo-800 dark:hover:bg-indigo-700 transition-colors text-white shadow"
+          title="Toggle Dark Mode"
+        >
+          🌙
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Controls Bar: Region Filter Pills & Sorting -->
+  <div class="max-w-6xl mx-auto px-4 mt-6 w-full flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+    <!-- Region Filter Pills -->
+    <div id="region-pills" class="flex flex-wrap gap-2">
+      <button data-region="All" class="region-pill px-3 py-1.5 text-xs font-semibold rounded-full bg-indigo-600 text-white shadow-sm transition-all">All Regions</button>
+      <button data-region="North America" class="region-pill px-3 py-1.5 text-xs font-semibold rounded-full bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all">North America</button>
+      <button data-region="South America" class="region-pill px-3 py-1.5 text-xs font-semibold rounded-full bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all">South America</button>
+      <button data-region="Europe" class="region-pill px-3 py-1.5 text-xs font-semibold rounded-full bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all">Europe</button>
+      <button data-region="Asia" class="region-pill px-3 py-1.5 text-xs font-semibold rounded-full bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all">Asia</button>
+      <button data-region="Africa" class="region-pill px-3 py-1.5 text-xs font-semibold rounded-full bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all">Africa</button>
+      <button data-region="Oceania" class="region-pill px-3 py-1.5 text-xs font-semibold rounded-full bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all">Oceania</button>
+      <button data-region="Middle East" class="region-pill px-3 py-1.5 text-xs font-semibold rounded-full bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all">Middle East</button>
+    </div>
+
+    <!-- Sorting Selection -->
+    <div class="flex items-center gap-2">
+      <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Sort by:</span>
+      <select id="sort-select" class="px-3 py-1.5 text-xs font-medium bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+        <option value="name-asc">Name (A-Z)</option>
+        <option value="name-desc">Name (Z-A)</option>
+        <option value="code-asc">Code (A-Z)</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <main class="flex-grow max-w-6xl mx-auto px-4 py-8 w-full">
+    
+    <!-- Status / Loading Indicator -->
+    <div id="status-message" class="text-center py-12 text-slate-500 dark:text-slate-400 font-medium">
+      Loading countries from API...
+    </div>
+
+    <!-- Country Grid -->
+    <div id="countries-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 hidden">
+      <!-- Dynamic cards injected via JS -->
+    </div>
+  </main>
+
+  <!-- Country Detail Modal -->
+  <div id="detail-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-xl max-w-md w-full overflow-hidden border border-slate-100 dark:border-slate-700 animate-in fade-in zoom-in duration-150">
+      <div class="p-6 bg-slate-50 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
+        <h3 id="modal-title" class="text-xl font-bold text-slate-900 dark:text-white">Country Details</h3>
+        <button id="modal-close" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-bold text-xl px-2">&times;</button>
+      </div>
+      <div class="p-6 space-y-4">
+        <div class="h-40 bg-slate-100 dark:bg-slate-900 rounded-xl flex items-center justify-center p-4 border border-slate-200 dark:border-slate-700">
+          <img id="modal-flag" src="" alt="Flag" class="max-h-full max-w-full object-contain shadow rounded">
+        </div>
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700">
+            <span class="text-slate-500 dark:text-slate-400">Country Name:</span>
+            <span id="modal-name" class="font-semibold text-slate-800 dark:text-slate-200"></span>
+          </div>
+          <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700">
+            <span class="text-slate-500 dark:text-slate-400">ISO Code:</span>
+            <span id="modal-code" class="font-semibold text-slate-800 dark:text-slate-200"></span>
+          </div>
+          <div class="flex justify-between py-1">
+            <span class="text-slate-500 dark:text-slate-400">Region:</span>
+            <span id="modal-region" class="font-semibold text-slate-800 dark:text-slate-200"></span>
+          </div>
+        </div>
+      </div>
+      <div class="p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-700 text-right">
+        <button id="modal-close-btn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors shadow">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 py-4 text-center text-xs text-slate-500 dark:text-slate-400 transition-colors duration-200">
+    Deployed seamlessly on Cloudflare Pages • Static Asset JSON API
+  </footer>
+
+  <!-- Script to Fetch, Filter, Sort and Handle Interactions -->
+  <script>
+    let allCountries = [];
+    let currentRegion = 'All';
+    let currentSearchQuery = '';
+    let currentSort = 'name-asc';
+
+    // Dark Mode Toggle Logic
+    const themeToggleBtn = document.getElementById('theme-toggle');
+    const htmlEl = document.documentElement;
+
+    if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      htmlEl.classList.add('dark');
+      themeToggleBtn.textContent = '☀️';
+    } else {
+      htmlEl.classList.remove('dark');
+      themeToggleBtn.textContent = '🌙';
+    }
+
+    themeToggleBtn.addEventListener('click', () => {
+      if (htmlEl.classList.contains('dark')) {
+        htmlEl.classList.remove('dark');
+        localStorage.theme = 'light';
+        themeToggleBtn.textContent = '🌙';
+      } else {
+        htmlEl.classList.add('dark');
+        localStorage.theme = 'dark';
+        themeToggleBtn.textContent = '☀️';
+      }
+    });
+
+    async function fetchCountries() {
+      const statusEl = document.getElementById('status-message');
+      const gridEl = document.getElementById('countries-grid');
+
+      try {
+        const response = await fetch('/api/countries.json');
+        if (!response.ok) throw new Error('Failed to load countries data.');
+        
+        allCountries = await response.json();
+        
+        statusEl.classList.add('hidden');
+        gridEl.classList.remove('hidden');
+        
+        applyFiltersAndRender();
+      } catch (error) {
+        statusEl.textContent = `Error: ${error.message}`;
+        statusEl.classList.add('text-red-500');
+      }
+    }
+
+    function applyFiltersAndRender() {
+      let result = [...allCountries];
+
+      if (currentRegion !== 'All') {
+        result = result.filter(c => c.region.toLowerCase().includes(currentRegion.toLowerCase()));
+      }
+
+      if (currentSearchQuery) {
+        result = result.filter(c => 
+          c.name.toLowerCase().includes(currentSearchQuery) || 
+          c.region.toLowerCase().includes(currentSearchQuery) ||
+          c.code.toLowerCase().includes(currentSearchQuery)
+        );
+      }
+
+      result.sort((a, b) => {
+        if (currentSort === 'name-asc') return a.name.localeCompare(b.name);
+        if (currentSort === 'name-desc') return b.name.localeCompare(a.name);
+        if (currentSort === 'code-asc') return a.code.localeCompare(b.code);
+        return 0;
+      });
+
+      renderCountries(result);
+    }
+
+    function renderCountries(countries) {
+      const gridEl = document.getElementById('countries-grid');
+      
+      if (countries.length === 0) {
+        gridEl.innerHTML = `<div class="col-span-full text-center py-12 text-slate-400 dark:text-slate-500">No countries found matching your criteria.</div>`;
+        return;
+      }
+
+      gridEl.innerHTML = countries.map(country => `
+        <div 
+          onclick="openModal('${country.code}')"
+          class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-500 transition-all flex flex-col cursor-pointer group"
+        >
+          <div class="h-36 bg-slate-100 dark:bg-slate-900 flex items-center justify-center p-4 border-b border-slate-100 dark:border-slate-700">
+            <img src="${country.flag}" alt="${country.name} flag" class="max-h-full max-w-full object-contain shadow-sm rounded group-hover:scale-105 transition-transform duration-200">
+          </div>
+          <div class="p-4 flex flex-col flex-grow justify-between">
+            <div>
+              <div class="flex justify-between items-start">
+                <h3 class="font-bold text-lg text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">${country.name}</h3>
+                <span class="text-xs font-semibold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded">${country.code}</span>
+              </div>
+              <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">${country.region}</p>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    const modalEl = document.getElementById('detail-modal');
+    function openModal(code) {
+      const country = allCountries.find(c => c.code === code);
+      if (!country) return;
+
+      document.getElementById('modal-title').textContent = country.name;
+      document.getElementById('modal-name').textContent = country.name;
+      document.getElementById('modal-code').textContent = country.code;
+      document.getElementById('modal-region').textContent = country.region;
+      document.getElementById('modal-flag').src = country.flag;
+      document.getElementById('modal-flag').alt = `${country.name} flag`;
+
+      modalEl.classList.remove('hidden');
+    }
+
+    function closeModal() {
+      modalEl.classList.add('hidden');
+    }
+
+    document.getElementById('modal-close').addEventListener('click', closeModal);
+    document.getElementById('modal-close-btn').addEventListener('click', closeModal);
+    modalEl.addEventListener('click', (e) => {
+      if (e.target === modalEl) closeModal();
+    });
+
+    document.getElementById('search-input').addEventListener('input', (e) => {
+      currentSearchQuery = e.target.value.toLowerCase().trim();
+      applyFiltersAndRender();
+    });
+
+    document.getElementById('sort-select').addEventListener('change', (e) => {
+      currentSort = e.target.value;
+      applyFiltersAndRender();
+    });
+
+    document.querySelectorAll('.region-pill').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.region-pill').forEach(b => {
+          b.className = "region-pill px-3 py-1.5 text-xs font-semibold rounded-full bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all";
+        });
+        e.target.className = "region-pill px-3 py-1.5 text-xs font-semibold rounded-full bg-indigo-600 text-white shadow-sm transition-all";
+        currentRegion = e.target.getAttribute('data-region');
+        applyFiltersAndRender();
+      });
+    });
+
+    fetchCountries();
+  </script>
+
+</body>
+</html>
